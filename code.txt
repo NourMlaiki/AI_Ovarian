@@ -1,0 +1,301 @@
+#data source  https://www.kaggle.com/datasets/saurabhshahane/predict-ovarian-cancer 
+#Supplementary data 1: It contains the original raw data.
+#Supplementary data 2: It contains a list of biomarkers, their abbreviations, and their descriptions used in the study.
+#Supplementary data 3: It contains the imputed version of the training data without the biomarker CA72-4.
+#Supplementary data 4: It contains the raw training data. (what we will be using for training our Machine Learning algorithms)
+#Supplementary data 5: It contains the raw test data. (what we will be using for testing our Machine Learning Algorithm)
+
+import numpy as np 
+import pandas as pd
+from sklearn.model_selection import train_test_split
+import os 
+
+# Reading in our data and converting it to pandas and numpy data
+dataset = 'Supplementary data 4.csv'
+data_pandas = pd.read_csv(dataset)
+data_numpy = data_pandas.to_numpy()
+
+# Fixing string errors in the data 
+
+def format_data(data_pandas, data_numpy):
+  AFP_new={}
+  new_col = []
+  for i in range(data_numpy.shape[0]):
+    value=data_numpy[i,1]
+    if isinstance(value,str):
+      value = value.strip("\t>")
+      
+    AFP_new[i]=float(value)
+    new_col.append(float(value))
+    
+  data_pandas['AFP']= AFP_new.values()
+  data_pandas = data_pandas.apply(pd.to_numeric, errors='coerce')
+  data_pandas.fillna(data_pandas.mean(numeric_only=True), inplace=True)
+  data_numpy = data_pandas.to_numpy()
+
+  return data_pandas, data_numpy
+
+#data normalization
+def normalize_data(x):
+  max_els = x.max(0)
+  min_els = x.min(0)
+
+  normalized_x = (x - min_els) / (max_els - min_els)   # TODO: Fill in. 
+  return normalized_x
+dataset_test = 'Supplementary data 5.csv'
+data_pandas_test = pd.read_csv(dataset_test)
+data_numpy_test = data_pandas_test.to_numpy()
+
+#x and y split
+data_pandas, data_numpy = format_data(data_pandas, data_numpy)
+data_pandas_test,data_numpy_test = format_data(data_pandas_test, data_numpy_test)
+
+def get_x_and_y(data_numpy):
+  x = np.concatenate((data_numpy[:,1:19], data_numpy[:,20:]), axis=1)
+  y = data_numpy[:,19]
+  return x, y
+
+x_test, y_test = get_x_and_y(data_numpy_test)
+x_train, y_train = get_x_and_y(data_numpy)
+x_train_normalized = normalize_data(x_train)
+x_test_normalized = normalize_data(x_test)
+
+x = np.concatenate((x_train_normalized, x_test_normalized))
+y = np.concatenate((y_train, y_test))
+
+x_train, x_test, y_train, y_test = train_test_split(x,y, test_size=0.15)
+
+#Training the model
+#Logistic Regression
+from sklearn.linear_model import LogisticRegression
+from numpy import array
+import matplotlib.pyplot as plt 
+
+
+acc=array([float()]*200)
+for i in range(0,200):
+  model = LogisticRegression(max_iter=i)
+
+  model.fit(x_train,y_train)
+  prediction = model.predict(x_test)
+  score_logreg = accuracy_score(y_test, prediction)
+  acc[i]=score_logreg
+
+x = np.arange(0, 200)
+plt.plot(x,acc)
+plt.ylabel('Accuracy')
+plt.xlabel('Iteration')
+plt.show()
+
+#Decision Tree
+from sklearn.tree import DecisionTreeClassifier
+
+
+model_tree = DecisionTreeClassifier(criterion = "gini",
+            random_state = 100,max_depth=5, min_samples_leaf=10)
+model_tree.fit(x_train,y_train)
+prediction_tree_gini= model_tree.predict(x_test)
+
+
+model_tree_entropy = DecisionTreeClassifier(
+            criterion = "entropy", random_state = 100,
+            max_depth = 5, min_samples_leaf = 10)
+model_tree_entropy.fit(x_train,y_train)
+prediction_tree_entropy= model_tree_entropy.predict(x_test)
+
+#Random Forest
+from sklearn.ensemble import RandomForestClassifier
+
+
+model_forest = RandomForestClassifier(criterion='gini',
+                                 n_estimators=10,
+                                 random_state=5,
+                                 n_jobs=10)
+model_forest.fit(x_train,y_train)
+prediction_forest= model_forest.predict(x_test)
+
+
+model_forest_entropy = RandomForestClassifier(criterion='entropy',
+                                 n_estimators=10,
+                                 random_state=5,
+                                 n_jobs=10)
+model_forest_entropy.fit(x_train,y_train)
+prediction_forest_entropy= model_forest_entropy.predict(x_test)
+
+#Neural Networks
+from sklearn.neural_network import MLPClassifier
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning)
+import matplotlib.pyplot as plt
+
+from numpy import array
+acc=array([float()]*200)
+prec = array([float()]*200)
+f11 = array([float()]*200)
+rec = array([float()]*200)
+for i in range(1,200):
+  nnet = MLPClassifier(hidden_layer_sizes=(250,150,100,80,60,20), learning_rate_init=0.001, solver="adam", max_iter= i)  
+  nnet.fit(x_train,y_train)
+  prediction_nnet = nnet.predict(x_test)
+  score_neural = accuracy_score(y_test, prediction_nnet)
+  precision_neural = precision_score(y_test,prediction_nnet)
+  recall_neural = recall_score(y_test,prediction_nnet)
+  f1_score_neural = f1_score(y_test, prediction_nnet)
+  acc[i]=score_neural
+  prec[i]=precision_neural
+  f11[i]=f1_score_neural
+  rec[i]=recall_neural
+
+  
+
+x = np.arange(0, 200)
+plt.plot(x,acc)
+plt.ylabel('Accuracy')
+plt.xlabel('Iteration')
+plt.show()
+
+#Evaluating the performances
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import precision_score
+from sklearn.metrics import recall_score
+from sklearn.metrics import f1_score
+from sklearn.metrics import confusion_matrix
+from sklearn.metrics import auc
+from sklearn.metrics import roc_curve, roc_auc_score
+import matplotlib.pyplot as plt
+
+#Logistic Regression
+score_logreg = accuracy_score(y_test, prediction)
+precision_logreg = precision_score(y_test,prediction)
+recall_logreg = recall_score(y_test,prediction)
+f1_score_logreg = f1_score(y_test, prediction)
+print("recall", recall_logreg)
+print("precision", precision_logreg)
+print("score",score_logreg)
+print("f1",f1_score_logreg)
+
+#Gini Based Decision Tree
+score_gini = accuracy_score(y_test, prediction_tree_gini)
+precision_gini = precision_score(y_test,prediction_tree_gini)
+recall_gini = recall_score(y_test,prediction_tree_gini)
+f1_score_gini = f1_score(y_test, prediction_tree_gini)
+print("score gini",score_gini)
+print("precision gini", precision_gini)
+print("recall gini",recall_gini)
+print("f1 score gini", f1_score_gini)
+
+#Entropy Based Decision Tree
+score_entropy=accuracy_score(y_test, prediction_tree_entropy)
+precision_entropy = precision_score(y_test,prediction_tree_entropy)
+recall_entropy = recall_score(y_test,prediction_tree_entropy)
+f1_score_entropy = f1_score(y_test, prediction_tree_entropy)
+print("score entropy",score_entropy)
+print("precision entropy", precision_entropy)
+print("recall entropy",recall_entropy)
+print("f1 score entropy", f1_score_entropy)
+
+#Gini Based Random Forest
+score_forest_gini = accuracy_score(y_test, prediction_forest)
+precision_forest_gini = precision_score(y_test,prediction_forest)
+recall_forest_gini = recall_score(y_test,prediction_forest)
+f1_score_forest_g = f1_score(y_test, prediction_forest)
+print("score forest gini",score_forest_gini)
+print("precision forest gini", precision_forest_gini)
+print("recall forest gini",recall_forest_gini)
+print("f1 score forest", f1_score_forest_g)
+
+#Entropy Based Random Forest
+score_forest_entropy = accuracy_score(y_test, prediction_forest_entropy)
+precision_forest_entropy = precision_score(y_test,prediction_forest_entropy)
+recall_forest_entropy = recall_score(y_test,prediction_forest_entropy)
+f1_score_forest_e = f1_score(y_test, prediction_forest_entropy)
+print("score forest entropy",score_forest_entropy)
+print("precision forest entropy", precision_forest_entropy)
+print("recall forest entropy",recall_forest_entropy)
+print("f1 score forest entropy", f1_score_forest_e)
+
+#Neural Network
+nnet2 = MLPClassifier(hidden_layer_sizes=(250,150,100,80,60,20), learning_rate_init=0.001, solver="lbfgs", max_iter= 176)  
+nnet2.fit(x_train,y_train)
+prediction_nnet2 = nnet2.predict(x_test)
+score_neural2 = accuracy_score(y_test, prediction_nnet2)
+precision_neural2 = precision_score(y_test,prediction_nnet2)
+recall_neural2 = recall_score(y_test,prediction_nnet2)
+f1_score_neural2 = f1_score(y_test, prediction_nnet2)
+
+print("score neural",score_neural2)
+print("precision neural", precision_neural2)
+print("recall  neural",recall_neural2)
+print("f1 score neural ", f1_score_neural2)
+#Confusion Matrix
+conf_matrix = confusion_matrix(y_true=y_test, y_pred=prediction_nnet)
+fig, ax = plt.subplots(figsize=(5, 5))
+ax.matshow(conf_matrix, cmap=plt.cm.Oranges, alpha=0.3)
+for i in range(conf_matrix.shape[0]):
+    for j in range(conf_matrix.shape[1]):
+        ax.text(x=j, y=i,s=conf_matrix[i, j], va='center', ha='center', size='xx-large')
+ 
+plt.xlabel('Predictions', fontsize=18)
+plt.ylabel('Correct', fontsize=18)
+plt.title('Confusion Matrix Neural Network', fontsize=18)
+plt.show()
+
+#ROC Curve
+y_pred_proba = nnet.predict_proba(x_test)[::,1]
+fpr, tpr, _ = roc_curve(y_test,  y_pred_proba)
+
+#create ROC curve
+plt.plot(fpr,tpr)
+plt.ylabel('True Positive Rate')
+plt.xlabel('False Positive Rate')
+plt.show()
+print(auc(fpr, tpr))
+
+#Comparing Performances
+import pandas as pd
+
+precisiondata={'precision':['precision','precision_gini','precision_entropy','precision_forest_gini','precision_forest_entropy','precision_neural'],'Value':[precision_logreg,precision_gini,precision_entropy,precision_forest_gini,precision_forest_entropy,precision_neural2]}
+
+scoredata={'score':['score','score_gini','score_entropy','score_forest_gini','score_forest_entropy','score_neural'],'Value':[score_logreg,score_gini,score_entropy,score_forest_gini,score_forest_entropy,score_neural2]}
+
+f1data={'f1':['f1_score','f1_score_gini','f1_score_entropy','f1_score_forest_g','f1_score_forest_e','f1_score_neural'],'Value':[f1_score_logreg,f1_score_gini,f1_score_entropy,f1_score_forest_g,f1_score_forest_e,f1_score_neural2]}
+
+recalldata={'recall':['recall','recall_gini','recall_entropy','recall_forest_gini','recall_forest_entropy','recall_neural'],'Value':[recall_logreg,recall_gini,recall_entropy,recall_forest_gini,recall_forest_entropy,recall_neural2]}
+
+precision_data=pd.DataFrame(precisiondata)
+score_data=pd.DataFrame(scoredata)
+f1_data=pd.DataFrame(f1data)
+recall_data=pd.DataFrame(recalldata)
+
+import seaborn as sns
+
+#Comparing Precision
+sns.barplot(precisiondata['precision'], precisiondata['Value'])
+plt.xticks(rotation=40)
+plt.xlabel('Model')
+plt.ylabel('Precision')
+plt.show()
+
+#Comparing Recall
+# sns.histplot(recalldata, x="recall", y="Value")
+sns.barplot(recalldata['recall'], recalldata['Value'])
+plt.xticks(rotation=40)
+plt.xlabel('Model')
+plt.ylabel('Recall')
+plt.show()
+
+#Comparing F1 Score
+sns.barplot(f1data['f1'], f1data['Value'])
+plt.xticks(rotation=40)
+plt.xlabel('Model')
+plt.ylabel('f1')
+# sns.color_palette("rocket", as_cmap=True)
+plt.show()
+
+#Comparing Accuracy
+# sns.histplot(scoredata, x="score", y="Value")
+sns.barplot(scoredata['score'], scoredata['Value'])
+plt.xticks(rotation=40)
+plt.xlabel('Model')
+plt.ylabel('Accuracy')
+plt.show()
